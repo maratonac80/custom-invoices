@@ -60,6 +60,9 @@ class Custom_Invoices_Orders_List {
         // Filter statusa narudžbe (wc status slug, npr. 'processing')
         $status_filter = isset( $_GET['ci_status'] ) ? sanitize_text_field( wp_unslash( $_GET['ci_status'] ) ) : 'all';
 
+        // NOVO: filter "samo narudžbe bez računa"
+        $only_without_invoice = ! empty( $_GET['ci_no_invoice'] ) ? (bool) absint( $_GET['ci_no_invoice'] ) : false;
+
         // WooCommerce statusi (key => label)
         $statuses = wc_get_order_statuses();
         // npr. 'wc-processing' => 'Processing'
@@ -79,7 +82,6 @@ class Custom_Invoices_Orders_List {
         $params[] = 'shop_order';
 
         $where[]  = "{$posts_table}.post_status NOT IN ('auto-draft')";
-        // bez parametara jer je literal
 
         // Filter statusa (ako nije "all")
         if ( $status_filter && $status_filter !== 'all' ) {
@@ -114,6 +116,14 @@ class Custom_Invoices_Orders_List {
                 $params[] = $like;
                 $params[] = $like;
             }
+        }
+
+        // NOVO: JOIN i uvjet za "bez računa"
+        if ( $only_without_invoice ) {
+            // LEFT JOIN na meta ključ _custom_invoice_attachment_id
+            $joins[] = "LEFT JOIN {$postmeta_table} AS pm_invoice ON (pm_invoice.post_id = {$posts_table}.ID AND pm_invoice.meta_key = '_custom_invoice_attachment_id')";
+            // Želimo one gdje meta NE postoji ili je prazna
+            $where[] = "(pm_invoice.meta_id IS NULL OR pm_invoice.meta_value = '' )";
         }
 
         $joins_sql = implode( ' ', array_unique( $joins ) );
@@ -174,7 +184,7 @@ class Custom_Invoices_Orders_List {
                 <?php esc_html_e( 'Ovdje su WooCommerce narudžbe s informacijom je li račun uploadan / poslan ili ne.', 'custom-invoices' ); ?>
             </p>
 
-            <!-- Filteri: search + status -->
+            <!-- Filteri: search + status + samo bez računa -->
             <form method="get" style="margin-bottom:12px;">
                 <input type="hidden" name="page" value="custom-invoices-orders" />
                 <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
@@ -205,10 +215,16 @@ class Custom_Invoices_Orders_List {
                         </select>
                     </div>
                     <div>
+                        <label style="display:flex;align-items:center;gap:4px;">
+                            <input type="checkbox" name="ci_no_invoice" value="1" <?php checked( $only_without_invoice, true ); ?> />
+                            <span><?php esc_html_e( 'Samo narudžbe bez računa', 'custom-invoices' ); ?></span>
+                        </label>
+                    </div>
+                    <div>
                         <button class="button button-secondary" type="submit">
                             <?php esc_html_e( 'Filtriraj', 'custom-invoices' ); ?>
                         </button>
-                        <?php if ( $search !== '' || ( $status_filter && $status_filter !== 'all' ) ) : ?>
+                        <?php if ( $search !== '' || ( $status_filter && $status_filter !== 'all' ) || $only_without_invoice ) : ?>
                             <a href="<?php echo esc_url( admin_url( 'admin.php?page=custom-invoices-orders' ) ); ?>" class="button">
                                 <?php esc_html_e( 'Resetiraj filtere', 'custom-invoices' ); ?>
                             </a>
@@ -311,13 +327,16 @@ class Custom_Invoices_Orders_List {
             if ( $total_pages > 1 ) :
                 $base_url = admin_url( 'admin.php?page=custom-invoices-orders' );
 
-                // Zadrži search i status u query stringu
+                // Zadrži search, status i checkbox u query stringu
                 $base_args = array();
                 if ( $search !== '' ) {
                     $base_args['ci_search'] = $search;
                 }
                 if ( $status_filter !== '' && $status_filter !== 'all' ) {
                     $base_args['ci_status'] = $status_filter;
+                }
+                if ( $only_without_invoice ) {
+                    $base_args['ci_no_invoice'] = 1;
                 }
 
                 $base_url = add_query_arg( $base_args, $base_url );

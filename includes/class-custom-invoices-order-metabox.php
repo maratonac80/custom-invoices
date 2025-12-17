@@ -43,13 +43,14 @@ class Custom_Invoices_Order_Metabox {
 
         // HPOS ekran – ostavimo u normal contextu
         add_meta_box(
-            'custom_invoices_order_invoices_hpos',
-            __( 'Računi kupca (PDF)', 'custom-invoices' ),
-            array( __CLASS__, 'render_box' ),
-            'woocommerce_page_wc-orders',
-            'normal', // Promena: Ovo obezbeđuje levi glavni stupac
-            'high'
-        );
+    'add_meta_box(
+    'custom_invoices_order_invoices',
+    __( 'Računi kupca (PDF)', 'custom-invoices' ),
+    array( __CLASS__, 'render_box' ),
+    'shop_order',
+    'normal', // Levi stupac
+    'high' // Prioritet
+);
     }
 
     public static function render_box( $post_or_order_object ) {
