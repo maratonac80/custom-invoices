@@ -37,17 +37,17 @@ class Custom_Invoices_Order_Metabox {
             __( 'Računi kupca (PDF)', 'custom-invoices' ),
             array( __CLASS__, 'render_box' ),
             'shop_order',
-            'normal',
+            'normal', // Promena: Ovo obezbeđuje levi glavni stupac
             'high'
         );
 
-        // HPOS ekran – ostavimo u side contextu
+        // HPOS ekran – ostavimo u normal contextu
         add_meta_box(
             'custom_invoices_order_invoices_hpos',
             __( 'Računi kupca (PDF)', 'custom-invoices' ),
             array( __CLASS__, 'render_box' ),
             'woocommerce_page_wc-orders',
-            'side',
+            'normal', // Promena: Ovo obezbeđuje levi glavni stupac
             'high'
         );
     }
@@ -69,7 +69,7 @@ class Custom_Invoices_Order_Metabox {
         $attachment_ids     = array_filter( explode( ',', $attachment_ids_str ) );
         $order_id           = $order->get_id();
 
-        // URL natrag na listu narudžbi u našem pluginu
+        // URL natrag na popis narudžbi u našem pluginu
         $back_url = menu_page_url( 'custom-invoices-orders', false );
 
         wp_nonce_field( 'save_invoice_nonce', 'invoice_nonce_field' );
@@ -78,7 +78,7 @@ class Custom_Invoices_Order_Metabox {
             <p class="description" style="margin-top:0;margin-bottom:10px;">
                 <?php esc_html_e( 'Učitaj PDF račune pa klikni "Pošalji email".', 'custom-invoices' ); ?>
             </p>
-            
+
             <ul id="invoice-list" style="margin-bottom:15px;background:#fff;border:1px solid:#ddd;">
                 <?php 
                 if ( ! empty( $attachment_ids ) ) {
