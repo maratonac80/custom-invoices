@@ -29,9 +29,9 @@ class Custom_Invoices_Orders_List {
     }
 
     public static function render_orders_page() {
-        if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            return;
-        }
+       if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
+    wp_die( __( 'Nemate dopuštenje za pregled ove stranice.', 'custom-invoices' ) );
+}
 
         if ( ! class_exists( 'WC_Order' ) ) {
             ?>
