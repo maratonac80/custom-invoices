@@ -134,8 +134,9 @@ function custom_invoices_get_email_html( $order, $attachments, $links_list_items
     $stored_intro   = get_option( 'custom_invoices_default_content_intro', '' );
     $content_intro  = $stored_intro !== '' ? $stored_intro : $default_intro_text;
 
-    // Note: custom_invoices_email_title and custom_invoices_hero_subtitle are NOT used
-    // They are always set based on language for consistency
+    // Note: custom_invoices_email_title and custom_invoices_hero_subtitle options are no longer used.
+    // Any previously stored custom values in the database will be ignored.
+    // Email title and header subtitle are now always set based on the selected language for consistency.
 
     // 4) Tekstovi pomoći (Help section) – već imaš override logiku
     $stored_help_title = get_option( 'custom_invoices_help_title', '' );
