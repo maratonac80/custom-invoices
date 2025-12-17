@@ -26,12 +26,33 @@ class Custom_Invoices_Order_Metabox {
         add_action( 'save_post', array( __CLASS__, 'save_meta_legacy' ) );
         add_action( 'woocommerce_process_shop_order_meta', array( __CLASS__, 'save_meta_hpos' ) );
 
+        // Učitaj WP media skripte na edit narudžbe (za upload PDF-ova)
+        add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_media' ) );
+
         // JS za pozicioniranje meta boxa u legacy editoru (shop_order)
         add_action( 'admin_footer-post.php', array( __CLASS__, 'reposition_metabox_js_legacy' ) );
         add_action( 'admin_footer-post-new.php', array( __CLASS__, 'reposition_metabox_js_legacy' ) );
 
         // JS za pozicioniranje meta boxa u HPOS editoru (Woo Orders screen)
         add_action( 'admin_footer', array( __CLASS__, 'reposition_metabox_js_hpos' ) );
+    }
+
+    /**
+     * Osiguraj da su WP media skripte učitane na našim ekranima.
+     */
+    public static function enqueue_media( $hook_suffix ) {
+        // Legacy edit narudžbe
+        if ( in_array( $hook_suffix, array( 'post.php', 'post-new.php' ), true ) ) {
+            $screen = get_current_screen();
+            if ( $screen && 'shop_order' === $screen->post_type ) {
+                wp_enqueue_media();
+            }
+        }
+
+        // HPOS Orders screen
+        if ( 'woocommerce_page_wc-orders' === $hook_suffix ) {
+            wp_enqueue_media();
+        }
     }
 
     public static function add_meta_box() {
@@ -108,41 +129,44 @@ class Custom_Invoices_Order_Metabox {
 
             <input type="hidden" id="custom_invoice_attachment_id" name="custom_invoice_attachment_id" value="<?php echo esc_attr( implode( ',', $attachment_ids ) ); ?>">
 
-<hr>
+            <hr>
 
-<div style="background:#fdfdfd;padding:10px;border:1px dashed #ccc;margin-top:10px;">
-    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-start;margin-bottom:6px;">
+            <div style="background:#fdfdfd;padding:10px;border:1px dashed #ccc;margin-top:10px;">
 
-        <button type="button"
-                class="button"
-                id="upload-invoice-btn">
-            <?php esc_html_e( 'Dodaj račun(e)', 'custom-invoices' ); ?>
-        </button>
+                <!-- TRI GUMBA U JEDNOM REDU, PORAVNATI DESNO -->
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;margin-bottom:6px;">
 
-        <button type="button"
-                class="button button-primary"
-                id="send-invoice-email-btn">
-            <span class="dashicons dashicons-email-alt" style="line-height:1.3;"></span>
-            <?php esc_html_e( 'Pošalji email', 'custom-invoices' ); ?>
-        </button>
+                    <button type="button"
+                            class="button"
+                            id="upload-invoice-btn">
+                        <?php esc_html_e( 'Dodaj račun(e)', 'custom-invoices' ); ?>
+                    </button>
 
-        <button type="button"
-                class="button button-secondary"
-                onclick="window.location.href='<?php echo esc_url( $back_url ); ?>';">
-            <?php esc_html_e( 'Natrag na popis računa', 'custom-invoices' ); ?>
-        </button>
+                    <button type="button"
+                            class="button button-primary"
+                            id="send-invoice-email-btn">
+                        <span class="dashicons dashicons-email-alt" style="line-height:1.3;"></span>
+                        <?php esc_html_e( 'Pošalji email', 'custom-invoices' ); ?>
+                    </button>
 
-    </div>
+                    <button type="button"
+                            class="button button-secondary"
+                            onclick="window.location.href='<?php echo esc_url( $back_url ); ?>';">
+                        <?php esc_html_e( 'Natrag na popis računa', 'custom-invoices' ); ?>
+                    </button>
 
-    <div id="email-sending-status" style="font-size:12px;text-align:left;"></div>
-</div>
+                </div>
 
-    <div id="email-sending-status" style="font-size:12px;text-align:center;"></div>
-</div>
+                <div id="email-sending-status" style="font-size:12px;text-align:left;"></div>
+            </div>
         </div>
 
         <script>
         jQuery(function($){
+
+            // Jedan media frame po stranici
+            var ciMediaFrame = null;
+
             function updateHiddenInput() {
                 var ids = [];
                 $('#invoice-list li[data-id]').each(function(){ ids.push($(this).data('id')); });
@@ -158,19 +182,31 @@ class Custom_Invoices_Order_Metabox {
 
             $('#upload-invoice-btn').on('click', function(e){
                 e.preventDefault();
-                var frame;
-                if (frame) { frame.open(); return; }
-                frame = wp.media({
+
+                if ( typeof wp === 'undefined' || ! wp.media ) {
+                    alert('<?php echo esc_js( __( 'Media uploader nije dostupan. Provjerite da li je WordPress media skripta učitana.', 'custom-invoices' ) ); ?>');
+                    return;
+                }
+
+                // Ako frame već postoji, samo ga otvori
+                if ( ciMediaFrame ) {
+                    ciMediaFrame.open();
+                    return;
+                }
+
+                ciMediaFrame = wp.media({
                     title: '<?php echo esc_js( __( 'Odaberi račune', 'custom-invoices' ) ); ?>',
                     multiple: true,
                     library: { type: 'application/pdf' },
                     button: { text: '<?php echo esc_js( __( 'Dodaj na narudžbu', 'custom-invoices' ) ); ?>' }
                 });
-                frame.on('select', function(){
-                    var selection = frame.state().get('selection');
+
+                ciMediaFrame.on('select', function(){
+                    var selection = ciMediaFrame.state().get('selection');
                     selection.map(function(attachment){
                         attachment = attachment.toJSON();
-                        var current_ids = $('#custom_invoice_attachment_id').val().split(',');
+                        var current_ids_raw = $('#custom_invoice_attachment_id').val();
+                        var current_ids = current_ids_raw ? current_ids_raw.split(',') : [];
                         if ($.inArray(String(attachment.id), current_ids) === -1) {
                             $('#invoice-list').append(
                                 '<li style="padding:8px;border-bottom:1px solid:#eee;display:flex;justify-content:space-between;align-items:center;" data-id="'+attachment.id+'">' +
@@ -181,9 +217,10 @@ class Custom_Invoices_Order_Metabox {
                         }
                     });
                     updateHiddenInput();
-                    $('#email-sending-status').html('<span style="color:#d63638;">⚠️ <?php echo esc_js( __( 'Klikni "Ažuriraj" narudžbu prije slanja emaila!', 'custom-invoices' ) ); ?></span>');
+                    $('#email-sending-status').html('<span style="color:#d63638;">⚠️ <?php echo esc_js( __( 'Klikni \"Ažuriraj\" narudžbu prije slanja emaila!', 'custom-invoices' ) ); ?></span>');
                 });
-                frame.open();
+
+                ciMediaFrame.open();
             });
 
             $('body').on('click', '.remove-single-invoice', function(e){
