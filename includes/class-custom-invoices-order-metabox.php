@@ -42,8 +42,7 @@ class Custom_Invoices_Order_Metabox {
         );
 
         // HPOS ekran – ostavimo u normal contextu
-        add_meta_box(
-    'add_meta_box(
+    add_meta_box(
     'custom_invoices_order_invoices',
     __( 'Računi kupca (PDF)', 'custom-invoices' ),
     array( __CLASS__, 'render_box' ),
