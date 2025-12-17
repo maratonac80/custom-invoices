@@ -156,23 +156,3 @@ function custom_invoices_admin_notice_hpos_compat() {
     echo '</a></p>';
     echo '</div>';
 }
-
-/**
- * DEBUG: prikaži HPOS state u adminu.
- * Ovo možeš obrisati kad više ne treba.
- */
-function custom_invoices_admin_notice_hpos_debug() {
-    if ( ! is_admin() || ! current_user_can( 'manage_woocommerce' ) ) {
-        return;
-    }
-
-    if ( ! function_exists( 'custom_invoices_get_hpos_state' ) ) {
-        return;
-    }
-
-    $state = custom_invoices_get_hpos_state();
-
-    echo '<div class="notice notice-info"><p><strong>Custom Invoices DEBUG</strong><br />';
-    echo 'HPOS enabled: ' . ( $state['hpos_enabled'] ? 'yes' : 'no' ) . '<br />';
-    echo 'Compat mode enabled: ' . ( $state['compat_mode_enabled'] ? 'yes' : 'no' ) . '</p></div>';
-}

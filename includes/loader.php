@@ -42,9 +42,6 @@ class Custom_Invoices_Loader {
 
         // Admin notice za HPOS bez compatibility moda
         add_action( 'admin_notices', 'custom_invoices_admin_notice_hpos_compat' );
-
-        // DEBUG: prikaži trenutno HPOS stanje
-        add_action( 'admin_notices', 'custom_invoices_admin_notice_hpos_debug' );
     }
 
     public static function activate( $network_wide = false ) {
