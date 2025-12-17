@@ -12,6 +12,7 @@
  * - obrađuje spremanje meta podataka kroz:
  *   - save_post (legacy),
  *   - woocommerce_process_shop_order_meta (HPOS).
+ * - OSIGURAVA da je meta box UVIJEK u LIJEVOM stupcu i treći po redu (legacy + HPOS).
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -24,6 +25,13 @@ class Custom_Invoices_Order_Metabox {
         add_action( 'add_meta_boxes', array( __CLASS__, 'add_meta_box' ) );
         add_action( 'save_post', array( __CLASS__, 'save_meta_legacy' ) );
         add_action( 'woocommerce_process_shop_order_meta', array( __CLASS__, 'save_meta_hpos' ) );
+
+        // JS za pozicioniranje meta boxa u legacy editoru (shop_order)
+        add_action( 'admin_footer-post.php', array( __CLASS__, 'reposition_metabox_js_legacy' ) );
+        add_action( 'admin_footer-post-new.php', array( __CLASS__, 'reposition_metabox_js_legacy' ) );
+
+        // JS za pozicioniranje meta boxa u HPOS editoru (Woo Orders screen)
+        add_action( 'admin_footer', array( __CLASS__, 'reposition_metabox_js_hpos' ) );
     }
 
     public static function add_meta_box() {
@@ -31,7 +39,7 @@ class Custom_Invoices_Order_Metabox {
             return;
         }
 
-        // Klasični orders ekran – glavni lijevi stupac (normal)
+        // Klasični orders ekran – glavni LIJEVI stupac (normal)
         add_meta_box(
             'custom_invoices_order_invoices',
             __( 'Računi kupca (PDF)', 'custom-invoices' ),
@@ -41,7 +49,7 @@ class Custom_Invoices_Order_Metabox {
             'high'
         );
 
-        // HPOS ekran – ostavimo u side contextu
+        // HPOS ekran – isto u LIJEVI stupac (normal)
         add_meta_box(
             'custom_invoices_order_invoices_hpos',
             __( 'Računi kupca (PDF)', 'custom-invoices' ),
@@ -100,27 +108,37 @@ class Custom_Invoices_Order_Metabox {
 
             <input type="hidden" id="custom_invoice_attachment_id" name="custom_invoice_attachment_id" value="<?php echo esc_attr( implode( ',', $attachment_ids ) ); ?>">
 
-            <button type="button" class="button" id="upload-invoice-btn" style="width:100%;margin-bottom:10px;">
-                <?php esc_html_e( 'Dodaj račun(e)', 'custom-invoices' ); ?>
-            </button>
+<hr>
 
-            <hr>
+<div style="background:#fdfdfd;padding:10px;border:1px dashed #ccc;margin-top:10px;">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-start;margin-bottom:6px;">
 
-            <div style="background:#fdfdfd;padding:10px;border:1px dashed #ccc;margin-top:10px;">
-                <button type="button" class="button button-primary" id="send-invoice-email-btn" style="width:100%;">
-                    <span class="dashicons dashicons-email-alt" style="line-height:1.3;"></span>
-                    <?php esc_html_e( 'Pošalji email (prilagođeni predložak)', 'custom-invoices' ); ?>
-                </button>
-                <div id="email-sending-status" style="margin-top:5px;font-size:12px;text-align:center;"></div>
+        <button type="button"
+                class="button"
+                id="upload-invoice-btn">
+            <?php esc_html_e( 'Dodaj račun(e)', 'custom-invoices' ); ?>
+        </button>
 
-                <!-- Gumb za povratak ispod "Pošalji email" -->
-                <button type="button"
-                        class="button button-secondary"
-                        style="width:100%;margin-top:10px;"
-                        onclick="window.location.href='<?php echo esc_url( $back_url ); ?>';">
-                    <?php esc_html_e( '← Natrag na popis narudžbi (Custom Invoices)', 'custom-invoices' ); ?>
-                </button>
-            </div>
+        <button type="button"
+                class="button button-primary"
+                id="send-invoice-email-btn">
+            <span class="dashicons dashicons-email-alt" style="line-height:1.3;"></span>
+            <?php esc_html_e( 'Pošalji email', 'custom-invoices' ); ?>
+        </button>
+
+        <button type="button"
+                class="button button-secondary"
+                onclick="window.location.href='<?php echo esc_url( $back_url ); ?>';">
+            <?php esc_html_e( 'Natrag na popis računa', 'custom-invoices' ); ?>
+        </button>
+
+    </div>
+
+    <div id="email-sending-status" style="font-size:12px;text-align:left;"></div>
+</div>
+
+    <div id="email-sending-status" style="font-size:12px;text-align:center;"></div>
+</div>
         </div>
 
         <script>
@@ -196,6 +214,94 @@ class Custom_Invoices_Order_Metabox {
                 }
             });
         });
+        </script>
+        <?php
+    }
+
+    /**
+     * Legacy editor (shop_order) – meta box u lijevom stupcu, treći po redu.
+     */
+    public static function reposition_metabox_js_legacy() {
+        global $post;
+
+        if ( ! $post || 'shop_order' !== $post->post_type ) {
+            return;
+        }
+        ?>
+        <script type="text/javascript">
+        (function($){
+            $(function() {
+                var $box = $('#custom_invoices_order_invoices');
+
+                if ( !$box.length ) {
+                    return;
+                }
+
+                var $normal = $('#normal-sortables');
+
+                if ( !$normal.length ) {
+                    return;
+                }
+
+                // Premjesti box u lijevi stupac
+                $box.appendTo($normal);
+
+                var $children = $normal.children('.postbox');
+
+                if ( $children.length > 2 ) {
+                    // Umetni nakon drugog -> treći po redu
+                    $box.insertAfter($children.eq(1));
+                }
+            });
+        })(jQuery);
+        </script>
+        <?php
+    }
+
+    /**
+     * HPOS Orders screen – meta box u lijevom području, treći po redu.
+     */
+    public static function reposition_metabox_js_hpos() {
+        $screen = get_current_screen();
+        if ( ! $screen || 'woocommerce_page_wc-orders' !== $screen->id ) {
+            return;
+        }
+        ?>
+        <script type="text/javascript">
+        (function($){
+            function repositionBox() {
+                var $box = $('#custom_invoices_order_invoices_hpos');
+
+                if ( !$box.length ) {
+                    return;
+                }
+
+                // Pokušaj naći container meta boxeva u lijevom području
+                var $normal = $box.closest('.meta-box-sortables');
+                if ( !$normal.length ) {
+                    $normal = $('#normal-sortables');
+                }
+
+                if ( !$normal.length ) {
+                    return;
+                }
+
+                $box.appendTo($normal);
+
+                var $children = $normal.children('.postbox');
+
+                if ( $children.length > 2 ) {
+                    $box.insertAfter($children.eq(1));
+                }
+            }
+
+            $(function(){
+                repositionBox();
+                // HPOS zna dinamički učitavati sadržaj, pa pokušaj više puta
+                setTimeout(repositionBox, 500);
+                setTimeout(repositionBox, 1500);
+            });
+        })(jQuery);
         </script>
         <?php
     }
