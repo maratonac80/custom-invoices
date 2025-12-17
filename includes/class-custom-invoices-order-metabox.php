@@ -47,7 +47,7 @@ class Custom_Invoices_Order_Metabox {
             __( 'Računi kupca (PDF)', 'custom-invoices' ),
             array( __CLASS__, 'render_box' ),
             'woocommerce_page_wc-orders',
-            'side',
+            'normal',
             'high'
         );
     }
