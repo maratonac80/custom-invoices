@@ -100,7 +100,7 @@ class Custom_Invoices_Order_Metabox {
                     var currentIds = attachmentIdsField.val();
                     var idsArray = currentIds ? currentIds.split(',') : [];
 
-                    selection.map(function(attachment) {
+                    selection.forEach(function(attachment) {
                         attachment = attachment.toJSON();
                         var attId = attachment.id.toString();
                         
