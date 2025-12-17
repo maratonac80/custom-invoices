@@ -13,6 +13,7 @@
  *   - save_post (legacy),
  *   - woocommerce_process_shop_order_meta (HPOS).
  * - OSIGURAVA da je meta box UVIJEK u LIJEVOM stupcu i treći po redu (legacy + HPOS).
+ * - DODANO: dinamičko (AJAX) spremanje popisa računa bez klika na "Ažuriraj narudžbu".
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -35,6 +36,9 @@ class Custom_Invoices_Order_Metabox {
 
         // JS za pozicioniranje meta boxa u HPOS editoru (Woo Orders screen)
         add_action( 'admin_footer', array( __CLASS__, 'reposition_metabox_js_hpos' ) );
+
+        // AJAX za dinamičko spremanje attachment ID-ova
+        add_action( 'wp_ajax_custom_invoices_update_attachments', array( __CLASS__, 'ajax_update_attachments' ) );
     }
 
     /**
@@ -171,6 +175,7 @@ class Custom_Invoices_Order_Metabox {
                 var ids = [];
                 $('#invoice-list li[data-id]').each(function(){ ids.push($(this).data('id')); });
                 $('#custom_invoice_attachment_id').val(ids.join(','));
+
                 if (!ids.length) {
                     if (!$('#invoice-list .empty-msg').length) {
                         $('#invoice-list').html('<li class="empty-msg" style="padding:10px;color:#777;"><?php echo esc_js( __( 'Još nema dodanih računa.', 'custom-invoices' ) ); ?></li>');
@@ -178,6 +183,26 @@ class Custom_Invoices_Order_Metabox {
                 } else {
                     $('#invoice-list .empty-msg').remove();
                 }
+
+                // DINAMIČKO SPREMANJE PREKO AJAX-A
+                var status = $('#email-sending-status');
+
+                status.html('<span style="color:blue;"><?php echo esc_js( __( 'Spremam račune...', 'custom-invoices' ) ); ?></span>');
+
+                $.post(ajaxurl, {
+                    action: 'custom_invoices_update_attachments',
+                    order_id: <?php echo (int) $order_id; ?>,
+                    attachment_ids: ids.join(','),
+                    security: '<?php echo wp_create_nonce( 'save_invoice_nonce' ); ?>'
+                }).done(function(resp){
+                    if (resp && resp.success) {
+                        status.html('<span style="color:green;"><?php echo esc_js( __( 'Računi su spremljeni.', 'custom-invoices' ) ); ?></span>');
+                    } else {
+                        status.html('<span style="color:#d63638;"><?php echo esc_js( __( 'Računi nisu spremljeni:', 'custom-invoices' ) ); ?> '+(resp && resp.data ? resp.data : '')+'</span>');
+                    }
+                }).fail(function(){
+                    status.html('<span style="color:#d63638;"><?php echo esc_js( __( 'Greška pri spremanju računa.', 'custom-invoices' ) ); ?></span>');
+                });
             }
 
             $('#upload-invoice-btn').on('click', function(e){
@@ -217,7 +242,6 @@ class Custom_Invoices_Order_Metabox {
                         }
                     });
                     updateHiddenInput();
-                    $('#email-sending-status').html('<span style="color:#d63638;">⚠️ <?php echo esc_js( __( 'Klikni \"Ažuriraj\" narudžbu prije slanja emaila!', 'custom-invoices' ) ); ?></span>');
                 });
 
                 ciMediaFrame.open();
@@ -341,6 +365,41 @@ class Custom_Invoices_Order_Metabox {
         })(jQuery);
         </script>
         <?php
+    }
+
+    /**
+     * AJAX: dinamičko spremanje attachment ID-ova.
+     */
+    public static function ajax_update_attachments() {
+        if ( ! current_user_can( 'edit_shop_orders' ) && ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'Nedovoljno prava.', 'custom-invoices' ) );
+        }
+
+        check_ajax_referer( 'save_invoice_nonce', 'security' );
+
+        $order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+        $ids_raw  = isset( $_POST['attachment_ids'] ) ? wp_unslash( $_POST['attachment_ids'] ) : '';
+
+        if ( ! $order_id ) {
+            wp_send_json_error( __( 'Pogrešan ID narudžbe.', 'custom-invoices' ) );
+        }
+
+        if ( ! custom_invoices_is_woocommerce_active() ) {
+            wp_send_json_error( __( 'WooCommerce nije aktivan.', 'custom-invoices' ) );
+        }
+
+        $order = wc_get_order( $order_id );
+        if ( ! $order ) {
+            wp_send_json_error( __( 'Narudžba nije pronađena.', 'custom-invoices' ) );
+        }
+
+        // Očisti vrijednost (ostavi samo brojeve i zareze)
+        $ids_clean = preg_replace( '/[^0-9,]/', '', $ids_raw );
+
+        $order->update_meta_data( '_custom_invoice_attachment_id', $ids_clean );
+        $order->save();
+
+        wp_send_json_success( __( 'Računi su spremljeni.', 'custom-invoices' ) );
     }
 
     public static function save_meta_legacy( $post_id ) {

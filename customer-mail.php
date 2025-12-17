@@ -8,6 +8,12 @@
  * - podržava dva moda:
  *   - "default" – gotov predložak s poljima iz admina,
  *   - "custom_html" – vlastiti HTML predložak s placeholderima {{order_number}}, {{billing_name}}, {{order_date}}, {{home_url}}, {{links_list}}.
+ *
+ * LOGIKA TEKSTOVA:
+ * - Za ključne tekstove (naslov, uvodni paragraf, podnaslov) plugin ima
+ *   predefinirane vrijednosti po jeziku (HR/EN).
+ * - Ako je odgovarajuće admin polje PRAZNO -> koristi se predefinirani tekst za odabrani jezik.
+ * - Ako admin upiše svoj tekst u polje -> koristi se taj tekst, bez obzira na jezik.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -113,7 +119,15 @@ function custom_invoices_get_email_html( $order, $attachments, $links_list_items
     $contact_email = get_option( 'custom_invoices_default_contact_email', 'yourmail@yourmail.com' );
     $contact_phone = get_option( 'custom_invoices_default_contact_phone', '+385 00 000 000' );
 
-    // MAIN — uvodni tekst (default po jeziku)
+    /* -----------------------------------------------
+     *  MAIN — uvodni tekst / naslov / podnaslov
+     *  - default po jeziku
+     *  - override vrijednostima iz admin polja (ako nisu prazna)
+     * ----------------------------------------------- */
+
+    // 1) Uvodni paragraf (Intro paragraph)
+    //   - u adminu ga spremaš u 'custom_invoices_default_content_intro'
+    //   - ako je prazno -> koristi default po jeziku
     if ( $lang === 'en' ) {
         $default_intro_text = 'Attached you will find your invoices. You can also download them using the links below.';
     } else {
@@ -122,18 +136,58 @@ function custom_invoices_get_email_html( $order, $attachments, $links_list_items
     $stored_intro   = get_option( 'custom_invoices_default_content_intro', '' );
     $content_intro  = $stored_intro !== '' ? $stored_intro : $default_intro_text;
 
-    // MAIN — naslovi pomoći (editable, s defaultom po jeziku)
+    // 2) Naslov e-maila (veliki naslov u HTML-u; u adminu odgovara polju "Shop Name / Company name" ili posebnom polju za naslov)
+    //    Ako želiš zasebno editable polje za naslov, možeš koristiti npr. opciju 'custom_invoices_email_title'.
+    $stored_email_title = get_option( 'custom_invoices_email_title', '' );
+
+    // 3) „Hero subtitle“ (podnaslov u plavom headeru) – admin ga može mijenjati preko opcije 'custom_invoices_hero_subtitle'
+    $stored_hero_subtitle_tpl = get_option( 'custom_invoices_hero_subtitle', '' );
+
+    // 4) Tekstovi pomoći (Help section) – već imaš logiku s default + override
     $stored_help_title = get_option( 'custom_invoices_help_title', '' );
     $stored_help_line  = get_option( 'custom_invoices_help_line', '' );
 
+    // Default vrijednosti za sve ove tekstove po jeziku
     if ( $lang === 'en' ) {
-        $default_help_title = 'Need help?';
-        $default_help_line  = 'Contact us at:';
+        $default_email_title       = 'Your invoices';
+        $default_hero_subtitle_tpl = 'We are sending you the invoice for your order #%s';
+        $default_greeting_tpl      = 'Dear %s,';
+        $default_box_title         = 'Invoices';
+        $default_box_hint          = 'You can also find your invoices in your account, under the "My Invoices" tab.';
+        $default_subject_tpl       = 'Your invoice for order #%s';
+        $default_help_title        = 'Need help?';
+        $default_help_line         = 'Contact us at:';
     } else {
-        $default_help_title = 'Trebate pomoć?';
-        $default_help_line  = 'Kontaktirajte nas na:';
+        $default_email_title       = 'Vaši računi';
+        $default_hero_subtitle_tpl = 'Šaljemo Vam račun po Vašoj narudžbi #%s';
+        $default_greeting_tpl      = 'Poštovani %s,';
+        $default_box_title         = 'Računi';
+        $default_box_hint          = 'Račune možete pronaći i u svom korisničkom računu, u kartici "Moji računi".';
+        $default_subject_tpl       = 'Vaš račun za narudžbu #%s';
+        $default_help_title        = 'Trebate pomoć?';
+        $default_help_line         = 'Kontaktirajte nas na:';
     }
 
+    // Primjena override‑a:
+    // - ako je admin ostavio polje prazno -> koristimo default_* po jeziku
+    // - ako je popunio opciju -> koristimo njegov tekst
+
+    // Naslov e-maila (HTML title i vizualni naslov)
+    $email_title = $stored_email_title !== '' ? $stored_email_title : $default_email_title;
+
+    // Hero subtitle (plavi dio) – može biti tpl sa %s ili običan tekst; ako admin stavi svoj, koristimo njega kao format string
+    $hero_subtitle_tpl = $stored_hero_subtitle_tpl !== '' ? $stored_hero_subtitle_tpl : $default_hero_subtitle_tpl;
+
+    // Greeting
+    // Ako jednog dana dodaš polje za greeting, možeš ovdje dodati sličan override;
+    // zasad koristimo samo default po jeziku.
+    $greeting_tpl = $default_greeting_tpl;
+
+    // Box title / hint
+    $box_title = $default_box_title;
+    $box_hint  = $default_box_hint;
+
+    // Help title / line – već postoje opcije
     $help_title = $stored_help_title !== '' ? $stored_help_title : $default_help_title;
     $help_line  = $stored_help_line  !== '' ? $stored_help_line  : $default_help_line;
 
@@ -154,25 +208,16 @@ function custom_invoices_get_email_html( $order, $attachments, $links_list_items
 
     $company_line = trim( $footer_company . ' | ' . $footer_address . ' | ' . $footer_tax_id, ' |' );
 
-    // FOOTER — copyright i textovi po jeziku
+    // FOOTER — copyright text po jeziku
     $site_name = get_bloginfo( 'name' );
     if ( $lang === 'en' ) {
-        $email_title       = 'Your invoices';
-        $hero_subtitle_tpl = 'We are sending you the invoice for your order #%s';
-        $greeting_tpl      = 'Dear %s,';
-        $box_title         = 'Invoices';
-        $box_hint          = 'You can also find your invoices in your account, under the "My Invoices" tab.';
-        $subject_tpl       = 'Your invoice for order #%s';
-        $footer_copy       = sprintf( 'Copyright © %d %s, All rights reserved.', date( 'Y' ), $site_name );
+        $footer_copy = sprintf( 'Copyright © %d %s, All rights reserved.', date( 'Y' ), $site_name );
     } else {
-        $email_title       = 'Vaši računi';
-        $hero_subtitle_tpl = 'Šaljemo Vam račun po Vašoj narudžbi #%s';
-        $greeting_tpl      = 'Poštovani %s,';
-        $box_title         = 'Računi';
-        $box_hint          = 'Račune možete pronaći i u svom korisničkom računu, u kartici "Moji računi".';
-        $subject_tpl       = 'Vaš račun za narudžbu #%s';
-        $footer_copy       = sprintf( 'Copyright © %d %s, Sva prava pridržana.', date( 'Y' ), $site_name );
+        $footer_copy = sprintf( 'Copyright © %d %s, Sva prava pridržana.', date( 'Y' ), $site_name );
     }
+
+    // Subject template (za wp_mail) – možeš kasnije dodati i override iz opcije ako želiš
+    $subject_tpl = $default_subject_tpl;
 
     // Subject u global (čita ga Custom_Invoices_Email_Sender)
     $GLOBALS['custom_invoices_last_email_subject'] = sprintf( $subject_tpl, $order_number );
