@@ -31,13 +31,23 @@ class Custom_Invoices_Order_Metabox {
             return;
         }
 
-        // Ovo dodaje meta box samo jednom
+        // Klasični orders ekran – glavni lijevi stupac (normal)
         add_meta_box(
             'custom_invoices_order_invoices',
             __( 'Računi kupca (PDF)', 'custom-invoices' ),
             array( __CLASS__, 'render_box' ),
             'shop_order',
             'normal',
+            'high'
+        );
+
+        // HPOS ekran – ostavimo u side contextu
+        add_meta_box(
+            'custom_invoices_order_invoices_hpos',
+            __( 'Računi kupca (PDF)', 'custom-invoices' ),
+            array( __CLASS__, 'render_box' ),
+            'woocommerce_page_wc-orders',
+            'side',
             'high'
         );
     }
@@ -59,7 +69,7 @@ class Custom_Invoices_Order_Metabox {
         $attachment_ids     = array_filter( explode( ',', $attachment_ids_str ) );
         $order_id           = $order->get_id();
 
-        // URL natrag na popis narudžbi u našem pluginu
+        // URL natrag na listu narudžbi u našem pluginu
         $back_url = menu_page_url( 'custom-invoices-orders', false );
 
         wp_nonce_field( 'save_invoice_nonce', 'invoice_nonce_field' );
@@ -68,7 +78,7 @@ class Custom_Invoices_Order_Metabox {
             <p class="description" style="margin-top:0;margin-bottom:10px;">
                 <?php esc_html_e( 'Učitaj PDF račune pa klikni "Pošalji email".', 'custom-invoices' ); ?>
             </p>
-
+            
             <ul id="invoice-list" style="margin-bottom:15px;background:#fff;border:1px solid:#ddd;">
                 <?php 
                 if ( ! empty( $attachment_ids ) ) {
@@ -112,6 +122,81 @@ class Custom_Invoices_Order_Metabox {
                 </button>
             </div>
         </div>
+
+        <script>
+        jQuery(function($){
+            function updateHiddenInput() {
+                var ids = [];
+                $('#invoice-list li[data-id]').each(function(){ ids.push($(this).data('id')); });
+                $('#custom_invoice_attachment_id').val(ids.join(','));
+                if (!ids.length) {
+                    if (!$('#invoice-list .empty-msg').length) {
+                        $('#invoice-list').html('<li class="empty-msg" style="padding:10px;color:#777;"><?php echo esc_js( __( 'Još nema dodanih računa.', 'custom-invoices' ) ); ?></li>');
+                    }
+                } else {
+                    $('#invoice-list .empty-msg').remove();
+                }
+            }
+
+            $('#upload-invoice-btn').on('click', function(e){
+                e.preventDefault();
+                var frame;
+                if (frame) { frame.open(); return; }
+                frame = wp.media({
+                    title: '<?php echo esc_js( __( 'Odaberi račune', 'custom-invoices' ) ); ?>',
+                    multiple: true,
+                    library: { type: 'application/pdf' },
+                    button: { text: '<?php echo esc_js( __( 'Dodaj na narudžbu', 'custom-invoices' ) ); ?>' }
+                });
+                frame.on('select', function(){
+                    var selection = frame.state().get('selection');
+                    selection.map(function(attachment){
+                        attachment = attachment.toJSON();
+                        var current_ids = $('#custom_invoice_attachment_id').val().split(',');
+                        if ($.inArray(String(attachment.id), current_ids) === -1) {
+                            $('#invoice-list').append(
+                                '<li style="padding:8px;border-bottom:1px solid:#eee;display:flex;justify-content:space-between;align-items:center;" data-id="'+attachment.id+'">' +
+                                '<a href="'+attachment.url+'" target="_blank" style="text-decoration:none;font-weight:500;">📄 '+attachment.filename+'</a>' +
+                                '<a href="#" class="remove-single-invoice" style="color:red;text-decoration:none;margin-left:10px;">&times;</a>' +
+                                '</li>'
+                            );
+                        }
+                    });
+                    updateHiddenInput();
+                    $('#email-sending-status').html('<span style="color:#d63638;">⚠️ <?php echo esc_js( __( 'Klikni "Ažuriraj" narudžbu prije slanja emaila!', 'custom-invoices' ) ); ?></span>');
+                });
+                frame.open();
+            });
+
+            $('body').on('click', '.remove-single-invoice', function(e){
+                e.preventDefault();
+                $(this).closest('li').remove();
+                updateHiddenInput();
+            });
+
+            $('#send-invoice-email-btn').on('click', function(e){
+                e.preventDefault();
+                var order_id = <?php echo (int) $order_id; ?>;
+                var nonce    = '<?php echo wp_create_nonce( 'send_invoice_email_nonce' ); ?>';
+                var status   = $('#email-sending-status');
+                if (confirm('<?php echo esc_js( __( 'Poslati email s računima (prilagođeni dizajn) kupcu?', 'custom-invoices' ) ); ?>')) {
+                    status.html('<span style="color:blue;"><?php echo esc_js( __( 'Slanje... ⏳', 'custom-invoices' ) ); ?></span>');
+                    $(this).prop('disabled', true);
+                    $.post(ajaxurl, { action:'send_custom_invoice_email', order_id:order_id, security:nonce }, function(resp){
+                        if (resp && resp.success) {
+                            status.html('<span style="color:green;font-weight:bold;">✅ '+resp.data+'</span>');
+                        } else {
+                            status.html('<span style="color:red;">❌ <?php echo esc_js( __( 'Greška:', 'custom-invoices' ) ); ?> '+(resp && resp.data ? resp.data : '')+'</span>');
+                        }
+                        $('#send-invoice-email-btn').prop('disabled', false);
+                    }).fail(function(){
+                        status.html('<span style="color:red;">❌ <?php echo esc_js( __( 'Dogodila se sistemska greška.', 'custom-invoices' ) ); ?></span>');
+                        $('#send-invoice-email-btn').prop('disabled', false);
+                    });
+                }
+            });
+        });
+        </script>
         <?php
     }
 
