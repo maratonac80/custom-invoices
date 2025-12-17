@@ -134,11 +134,8 @@ function custom_invoices_get_email_html( $order, $attachments, $links_list_items
     $stored_intro   = get_option( 'custom_invoices_default_content_intro', '' );
     $content_intro  = $stored_intro !== '' ? $stored_intro : $default_intro_text;
 
-    // 2) Naslov e-maila (HTML <title> i glavni naslov) – opcionalni override
-    $stored_email_title = get_option( 'custom_invoices_email_title', '' );
-
-    // 3) Podnaslov u headeru (hero subtitle) – opcionalni override
-    $stored_hero_subtitle_tpl = get_option( 'custom_invoices_hero_subtitle', '' );
+    // Note: custom_invoices_email_title and custom_invoices_hero_subtitle are NOT used
+    // They are always set based on language for consistency
 
     // 4) Tekstovi pomoći (Help section) – već imaš override logiku
     $stored_help_title = get_option( 'custom_invoices_help_title', '' );
@@ -165,9 +162,9 @@ function custom_invoices_get_email_html( $order, $attachments, $links_list_items
         $default_help_line         = 'Kontaktirajte nas na:';
     }
 
-    // Primjena override‑a
-    $email_title       = $stored_email_title       !== '' ? $stored_email_title       : $default_email_title;
-    $hero_subtitle_tpl = $stored_hero_subtitle_tpl !== '' ? $stored_hero_subtitle_tpl : $default_hero_subtitle_tpl;
+    // Always use language-based defaults for consistency
+    $email_title       = $default_email_title;
+    $hero_subtitle_tpl = $default_hero_subtitle_tpl;
     $greeting_tpl      = $default_greeting_tpl; // trenutno bez zasebnog override polja
     $box_title         = $default_box_title;
     $box_hint          = $default_box_hint;
