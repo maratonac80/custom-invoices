@@ -81,21 +81,19 @@ class Custom_Invoices_Account_Endpoint {
             'order'    => 'DESC',
         ) );
 
-        // Debug logging for orders and invoice data
-        if ( self::is_debug_enabled() ) {
-            error_log( 'Custom Invoices: Found ' . count( $orders ) . ' orders for user ' . $current_user_id );
-        }
-
         $has_invoices = false;
         if ( $orders ) {
+            // Debug logging for orders
+            if ( self::is_debug_enabled() ) {
+                error_log( 'Custom Invoices: Found ' . count( $orders ) . ' orders for user ' . $current_user_id );
+            }
+
             foreach ( $orders as $order ) {
                 $ids = $order->get_meta( '_custom_invoice_attachment_id' );
-                
                 // Debug logging for invoice meta data
                 if ( self::is_debug_enabled() && ! empty( $ids ) ) {
                     error_log( 'Custom Invoices: Order #' . $order->get_id() . ' has invoice IDs: ' . $ids );
                 }
-                
                 if ( ! empty( $ids ) ) {
                     $has_invoices = true;
                     break;
