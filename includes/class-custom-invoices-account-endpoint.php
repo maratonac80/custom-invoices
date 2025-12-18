@@ -14,6 +14,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Custom_Invoices_Account_Endpoint {
 
+    /**
+     * Check if debug mode is enabled.
+     *
+     * @return bool
+     */
+    private static function is_debug_enabled() {
+        return defined( 'WP_DEBUG' ) && WP_DEBUG;
+    }
+
     public static function init() {
         add_action( 'init', array( __CLASS__, 'register_endpoint' ) );
         add_filter( 'query_vars', array( __CLASS__, 'add_query_vars' ) );
@@ -49,7 +58,7 @@ class Custom_Invoices_Account_Endpoint {
 
     public static function render_endpoint() {
         // Debug logging to verify endpoint is triggered
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+        if ( self::is_debug_enabled() ) {
             error_log( 'Custom Invoices: render_endpoint called for user ' . get_current_user_id() );
         }
 
@@ -73,7 +82,7 @@ class Custom_Invoices_Account_Endpoint {
         ) );
 
         // Debug logging for orders and invoice data
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+        if ( self::is_debug_enabled() ) {
             error_log( 'Custom Invoices: Found ' . count( $orders ) . ' orders for user ' . $current_user_id );
         }
 
@@ -83,7 +92,7 @@ class Custom_Invoices_Account_Endpoint {
                 $ids = $order->get_meta( '_custom_invoice_attachment_id' );
                 
                 // Debug logging for invoice meta data
-                if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $ids ) ) {
+                if ( self::is_debug_enabled() && ! empty( $ids ) ) {
                     error_log( 'Custom Invoices: Order #' . $order->get_id() . ' has invoice IDs: ' . $ids );
                 }
                 
