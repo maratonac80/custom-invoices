@@ -27,15 +27,15 @@ class Custom_Invoices_Account_Endpoint {
         add_action( 'init', array( __CLASS__, 'register_endpoint' ) );
         add_filter( 'query_vars', array( __CLASS__, 'add_query_vars' ) );
         add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'add_menu_item' ) );
-        add_action( 'woocommerce_account_moji-racuni_endpoint', array( __CLASS__, 'render_endpoint' ) );
+        add_action( 'woocommerce_account_moji_racuni_endpoint', array( __CLASS__, 'render_endpoint' ) );
     }
 
     public static function register_endpoint() {
-        add_rewrite_endpoint( 'moji-racuni', EP_ROOT | EP_PAGES );
+        add_rewrite_endpoint( 'moji_racuni', EP_ROOT | EP_PAGES );
     }
 
     public static function add_query_vars( $vars ) {
-        $vars[] = 'moji-racuni';
+        $vars[] = 'moji_racuni';
         return $vars;
     }
 
@@ -44,13 +44,13 @@ class Custom_Invoices_Account_Endpoint {
 
         foreach ( $items as $key => $label ) {
             if ( 'customer-logout' === $key ) {
-                $new['moji-racuni'] = __( 'Moji računi', 'custom-invoices' );
+                $new['moji_racuni'] = __( 'Moji računi', 'custom-invoices' );
             }
             $new[ $key ] = $label;
         }
 
-        if ( ! isset( $new['moji-racuni'] ) ) {
-            $new['moji-racuni'] = __( 'Moji računi', 'custom-invoices' );
+        if ( ! isset( $new['moji_racuni'] ) ) {
+            $new['moji_racuni'] = __( 'Moji računi', 'custom-invoices' );
         }
 
         return $new;
