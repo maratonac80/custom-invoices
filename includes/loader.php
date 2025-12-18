@@ -55,7 +55,7 @@ class Custom_Invoices_Loader {
         // Ako WooCommerce endpoint za "Moji računi" treba rewrite rules
         if ( function_exists( 'custom_invoices_is_woocommerce_active' ) && custom_invoices_is_woocommerce_active() ) {
             // Registruj endpoint prije flush-a
-            add_rewrite_endpoint( 'moji_racuni', EP_ROOT | EP_PAGES );
+            add_rewrite_endpoint( 'moji-racuni', EP_ROOT | EP_PAGES );
             flush_rewrite_rules();
         }
     }

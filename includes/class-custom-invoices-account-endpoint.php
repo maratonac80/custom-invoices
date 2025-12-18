@@ -14,28 +14,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Custom_Invoices_Account_Endpoint {
 
-    /**
-     * Check if debug mode is enabled.
-     *
-     * @return bool
-     */
-    private static function is_debug_enabled() {
-        return defined( 'WP_DEBUG' ) && WP_DEBUG;
-    }
-
     public static function init() {
         add_action( 'init', array( __CLASS__, 'register_endpoint' ) );
         add_filter( 'query_vars', array( __CLASS__, 'add_query_vars' ) );
         add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'add_menu_item' ) );
-        add_action( 'woocommerce_account_moji_racuni_endpoint', array( __CLASS__, 'render_endpoint' ) );
+        add_action( 'woocommerce_account_moji-racuni_endpoint', array( __CLASS__, 'render_endpoint' ) );
     }
 
     public static function register_endpoint() {
-        add_rewrite_endpoint( 'moji_racuni', EP_ROOT | EP_PAGES );
+        add_rewrite_endpoint( 'moji-racuni', EP_ROOT | EP_PAGES );
     }
 
     public static function add_query_vars( $vars ) {
-        $vars[] = 'moji_racuni';
+        $vars[] = 'moji-racuni';
         return $vars;
     }
 
@@ -44,24 +35,19 @@ class Custom_Invoices_Account_Endpoint {
 
         foreach ( $items as $key => $label ) {
             if ( 'customer-logout' === $key ) {
-                $new['moji_racuni'] = __( 'Moji računi', 'custom-invoices' );
+                $new['moji-racuni'] = __( 'Moji računi', 'custom-invoices' );
             }
             $new[ $key ] = $label;
         }
 
-        if ( ! isset( $new['moji_racuni'] ) ) {
-            $new['moji_racuni'] = __( 'Moji računi', 'custom-invoices' );
+        if ( ! isset( $new['moji-racuni'] ) ) {
+            $new['moji-racuni'] = __( 'Moji računi', 'custom-invoices' );
         }
 
         return $new;
     }
 
     public static function render_endpoint() {
-        // Debug logging to verify endpoint is triggered
-        if ( self::is_debug_enabled() ) {
-            error_log( 'Custom Invoices: render_endpoint called for user ' . get_current_user_id() );
-        }
-
         if ( ! custom_invoices_is_woocommerce_active() ) {
             echo '<p>' . esc_html__( 'WooCommerce mora biti aktivan kako bi se prikazali računi.', 'custom-invoices' ) . '</p>';
             return;
@@ -83,17 +69,8 @@ class Custom_Invoices_Account_Endpoint {
 
         $has_invoices = false;
         if ( $orders ) {
-            // Debug logging for orders
-            if ( self::is_debug_enabled() ) {
-                error_log( 'Custom Invoices: Found ' . count( $orders ) . ' orders for user ' . $current_user_id );
-            }
-
             foreach ( $orders as $order ) {
                 $ids = $order->get_meta( '_custom_invoice_attachment_id' );
-                // Debug logging for invoice meta data
-                if ( self::is_debug_enabled() && ! empty( $ids ) ) {
-                    error_log( 'Custom Invoices: Order #' . $order->get_id() . ' has invoice IDs: ' . $ids );
-                }
                 if ( ! empty( $ids ) ) {
                     $has_invoices = true;
                     break;
