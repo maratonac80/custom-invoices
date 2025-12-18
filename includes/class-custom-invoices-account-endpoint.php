@@ -16,12 +16,18 @@ class Custom_Invoices_Account_Endpoint {
 
     public static function init() {
         add_action( 'init', array( __CLASS__, 'register_endpoint' ) );
+        add_filter( 'query_vars', array( __CLASS__, 'add_query_vars' ) );
         add_filter( 'woocommerce_account_menu_items', array( __CLASS__, 'add_menu_item' ) );
         add_action( 'woocommerce_account_moji-racuni_endpoint', array( __CLASS__, 'render_endpoint' ) );
     }
 
     public static function register_endpoint() {
         add_rewrite_endpoint( 'moji-racuni', EP_ROOT | EP_PAGES );
+    }
+
+    public static function add_query_vars( $vars ) {
+        $vars[] = 'moji-racuni';
+        return $vars;
     }
 
     public static function add_menu_item( $items ) {
@@ -42,6 +48,11 @@ class Custom_Invoices_Account_Endpoint {
     }
 
     public static function render_endpoint() {
+        // Debug logging to verify endpoint is triggered
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+            error_log( 'Custom Invoices: render_endpoint called for user ' . get_current_user_id() );
+        }
+
         if ( ! custom_invoices_is_woocommerce_active() ) {
             echo '<p>' . esc_html__( 'WooCommerce mora biti aktivan kako bi se prikazali računi.', 'custom-invoices' ) . '</p>';
             return;
@@ -61,10 +72,21 @@ class Custom_Invoices_Account_Endpoint {
             'order'    => 'DESC',
         ) );
 
+        // Debug logging for orders and invoice data
+        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+            error_log( 'Custom Invoices: Found ' . count( $orders ) . ' orders for user ' . $current_user_id );
+        }
+
         $has_invoices = false;
         if ( $orders ) {
             foreach ( $orders as $order ) {
                 $ids = $order->get_meta( '_custom_invoice_attachment_id' );
+                
+                // Debug logging for invoice meta data
+                if ( defined( 'WP_DEBUG' ) && WP_DEBUG && ! empty( $ids ) ) {
+                    error_log( 'Custom Invoices: Order #' . $order->get_id() . ' has invoice IDs: ' . $ids );
+                }
+                
                 if ( ! empty( $ids ) ) {
                     $has_invoices = true;
                     break;
