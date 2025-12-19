@@ -27,7 +27,12 @@ class Custom_Invoices_Updater {
             return false;
         }
 
-        if ( ! is_array( $release_data ) || ! isset( $release_data['tag_name'] ) || empty( $release_data['tag_name'] ) ) {
+        if ( ! is_array( $release_data ) ) {
+            error_log( 'Custom Invoices Updater - GitHub API response is not an array' );
+            return false;
+        }
+
+        if ( ! isset( $release_data['tag_name'] ) || empty( $release_data['tag_name'] ) ) {
             error_log( 'Custom Invoices Updater - Invalid or missing tag_name in GitHub API response' );
             return false;
         }
