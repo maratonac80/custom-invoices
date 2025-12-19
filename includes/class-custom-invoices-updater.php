@@ -126,12 +126,12 @@ class Custom_Invoices_Updater {
 
         // Get the expected directory name
         $plugin_folder = dirname( plugin_basename( CUSTOM_INVOICES_PLUGIN_FILE ) );
-        
+
         // Validate plugin folder name
         if ( empty( $plugin_folder ) || $plugin_folder === '.' ) {
             return $source;
         }
-        
+
         // Check if source already has correct name
         if ( basename( $source ) === $plugin_folder ) {
             return $source;
@@ -139,7 +139,6 @@ class Custom_Invoices_Updater {
 
         // Rename the directory
         $new_source = trailingslashit( $remote_source ) . $plugin_folder;
-        
         if ( $wp_filesystem->move( $source, $new_source ) ) {
             return $new_source;
         }
