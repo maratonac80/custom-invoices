@@ -9,6 +9,19 @@ class Custom_Invoices_Updater {
     const GITHUB_API_URL = 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest';
     const FALLBACK_VERSION = 'v1.0.9';
 
+    /**
+     * Normalize version string by removing 'v' or 'V' prefix.
+     *
+     * @param string $version Version string to normalize.
+     * @return string Normalized version string.
+     */
+    private static function normalize_version( $version ) {
+        if ( empty( $version ) ) {
+            return '';
+        }
+        return ltrim( (string) $version, 'vV' );
+    }
+
     public static function init() {
         add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'check_for_updates' ) );
         add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 10, 3 );
@@ -59,8 +72,12 @@ class Custom_Invoices_Updater {
             return $transient;
         }
 
+        // Normalize both versions before comparison
+        $current_version = self::normalize_version( $plugin_data['Version'] );
+        $normalized_latest = self::normalize_version( $latest_version );
+
         // Provjera trenutne verzije i dohvat nove
-        if ( version_compare( $plugin_data['Version'], $latest_version, '<' ) ) {
+        if ( version_compare( $current_version, $normalized_latest, '<' ) ) {
             $transient->response[ plugin_basename( CUSTOM_INVOICES_PLUGIN_FILE ) ] = (object) array(
                 'slug'        => $plugin_slug,
                 'plugin'      => plugin_basename( CUSTOM_INVOICES_PLUGIN_FILE ),
