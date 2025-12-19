@@ -16,12 +16,18 @@ class Custom_Invoices_Updater {
         $repo_url    = 'https://github.com/maratonac80/custom-invoices';
         $plugin_data = get_plugin_data( CUSTOM_INVOICES_PLUGIN_FILE );
 
-        $response = wp_remote_get( $repo_url . '/releases/latest' );
+        // Dohvati podatke o zadnjem release-u s GitHub-a
+        $response = wp_remote_get( 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest' );
         if ( is_wp_error( $response ) ) {
+            error_log( 'API error: ' . $response->get_error_message() );
             return $transient;
         }
 
-        $latest_version = json_decode( wp_remote_retrieve_body( $response ), true )['tag_name'];
+        // Decodiraj podatke
+        $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
+        $latest_version = isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : '';
+
+        // Provjera trenutne verzije i dohvat nove
         if ( version_compare( $plugin_data['Version'], $latest_version, '<' ) ) {
             $transient->response[ plugin_basename( CUSTOM_INVOICES_PLUGIN_FILE ) ] = (object) array(
                 'slug'        => $plugin_slug,
@@ -29,7 +35,10 @@ class Custom_Invoices_Updater {
                 'url'         => $repo_url,
                 'package'     => $repo_url . '/archive/refs/tags/' . $latest_version . '.zip',
             );
+        } else {
+            error_log( 'Plugin is already up-to-date.' );
         }
+
         return $transient;
     }
 
@@ -38,17 +47,19 @@ class Custom_Invoices_Updater {
             return false;
         }
 
+        $latest_version = 'v1.0.1'; // Zamijeniti sa API dohvatom ako je potrebno
+
         return (object) array(
             'name'        => 'Custom Invoices Plugin',
             'slug'        => 'custom-invoices',
-            'version'     => '1.0.0',
+            'version'     => $latest_version,
             'author'      => 'Zoran Filipović <https://peroneus.hr>',
             'description' => 'Plugin for custom invoice handling.',
             'homepage'    => 'https://github.com/maratonac80/custom-invoices',
             'sections'    => array(
                 'description' => 'Easily manage invoices and update the plugin from WordPress admin.',
             ),
-            'download_link' => 'https://github.com/maratonac80/custom-invoices/archive/refs/tags/v1.0.0.zip',
+            'download_link' => 'https://github.com/maratonac80/custom-invoices/archive/refs/tags/' . $latest_version . '.zip',
         );
     }
 }
