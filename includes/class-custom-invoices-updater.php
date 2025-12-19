@@ -16,7 +16,10 @@ class Custom_Invoices_Updater {
      * @return string Normalized version string.
      */
     private static function normalize_version( $version ) {
-        return ltrim( $version, 'vV' );
+        if ( empty( $version ) ) {
+            return '';
+        }
+        return ltrim( (string) $version, 'vV' );
     }
 
     public static function init() {
