@@ -22,12 +22,17 @@ class Custom_Invoices_Updater {
         }
 
         $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
-        if ( $release_data === null || ! is_array( $release_data ) ) {
-            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response' );
+        if ( json_last_error() !== JSON_ERROR_NONE ) {
+            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response: ' . json_last_error_msg() );
             return false;
         }
 
-        return isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : false;
+        if ( ! is_array( $release_data ) || ! isset( $release_data['tag_name'] ) || empty( $release_data['tag_name'] ) ) {
+            error_log( 'Custom Invoices Updater - Invalid or missing tag_name in GitHub API response' );
+            return false;
+        }
+
+        return $release_data['tag_name'];
     }
 
     public static function check_for_updates( $transient ) {
