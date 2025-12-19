@@ -33,3 +33,8 @@ register_activation_hook( __FILE__, array( 'Custom_Invoices_Loader', 'activate' 
 register_deactivation_hook( __FILE__, array( 'Custom_Invoices_Loader', 'deactivate' ) );
 
 add_action( 'plugins_loaded', array( 'Custom_Invoices_Loader', 'init' ) );
+add_action( 'admin_init', function() {
+    // Ovaj dio briše keš koji WordPress koristi za provjeru ažuriranja plugina.
+    delete_site_transient( 'update_plugins' );
+    error_log( 'Transient update_plugins deleted.' );
+});
