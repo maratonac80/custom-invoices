@@ -30,7 +30,7 @@ class Custom_Invoices_Updater {
 
         $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
         if ( json_last_error() !== JSON_ERROR_NONE ) {
-            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response' );
+            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response: ' . json_last_error_msg() );
             return false;
         }
 
