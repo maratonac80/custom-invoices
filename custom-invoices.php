@@ -3,7 +3,7 @@
  Plugin Name: Custom Invoices
  Plugin URI: https://github.com/maratonac80/custom-invoices
  Description: Plugin for custom invoice handling.
- Version: 1.0.0
+ Version: 1.0.1
  Author: Zoran Filipović
  Author URI: https://peroneus.hr
 */
