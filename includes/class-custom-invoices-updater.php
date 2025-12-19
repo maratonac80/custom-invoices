@@ -7,6 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Custom_Invoices_Updater {
 
     const GITHUB_API_URL = 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest';
+    const FALLBACK_VERSION = 'v1.0.1';
 
     public static function init() {
         add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'check_for_updates' ) );
@@ -16,11 +17,16 @@ class Custom_Invoices_Updater {
     private static function get_latest_version_from_github() {
         $response = wp_remote_get( self::GITHUB_API_URL );
         if ( is_wp_error( $response ) ) {
-            error_log( 'API error: ' . $response->get_error_message() );
+            error_log( 'Custom Invoices Updater - Failed to fetch latest version from GitHub API: ' . $response->get_error_message() );
             return false;
         }
 
         $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
+        if ( $release_data === null || ! is_array( $release_data ) ) {
+            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response' );
+            return false;
+        }
+
         return isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : false;
     }
 
@@ -58,7 +64,7 @@ class Custom_Invoices_Updater {
         // Dohvati najnoviju verziju s GitHub-a
         $latest_version = self::get_latest_version_from_github();
         if ( ! $latest_version ) {
-            $latest_version = 'v1.0.1'; // Fallback verzija
+            $latest_version = self::FALLBACK_VERSION;
         }
 
         return (object) array(
