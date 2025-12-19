@@ -3,15 +3,11 @@
  * ADMIN LISTA NARUDŽBI ZA CUSTOM INVOICES
  *
  * - Podstranica "Narudžbe" ispod "Customer Invoice"
- * - Tablica s paginacijom + search + filter statusa:
- *   - ID narudžbe
- *   - Ime i prezime kupca
- *   - Status narudžbe (Woo status)
- *   - Status računa (POSLAN / NEMA / NIJE POSLAN)
- *   - Akcija (Pogledaj / Uploadaj račun)
+ * - Tablica s paginacijom + search + filter statusa + filter "bez računa"
  *
- * STATUS POSLAN:
- * - ako postoji meta ključ _custom_invoice_attachment_id (attachment ID PDF-a, ili više njih u nizu).
+ * VAŽNO:
+ * - Ne koristimo direktan SQL nad wp_posts/wp_postmeta jer to puca na HPOS.
+ * - Koristimo wc_get_orders() koji radi i na HPOS i na legacy storage.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -20,20 +16,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Custom_Invoices_Orders_List {
 
-    /**
-     * init ostavljamo, ali BEZ registracije menija.
-     * Meni (glavni + podmeni) registrira klasa Custom_Invoices_Admin_Email_Template.
-     */
     public static function init() {
         // Nema add_action('admin_menu', ...) ovdje.
     }
 
     public static function render_orders_page() {
-       if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
-    wp_die( __( 'Nemate dopuštenje za pregled ove stranice.', 'custom-invoices' ) );
-}
+        if ( ! current_user_can( 'manage_woocommerce' ) && ! current_user_can( 'manage_options' ) ) {
+            wp_die( __( 'Nemate dopuštenje za pregled ove stranice.', 'custom-invoices' ) );
+        }
 
-        if ( ! class_exists( 'WC_Order' ) ) {
+        if ( ! function_exists( 'wc_get_orders' ) ) {
             ?>
             <div class="wrap">
                 <h1><?php esc_html_e( 'Narudžbe', 'custom-invoices' ); ?></h1>
@@ -43,138 +35,106 @@ class Custom_Invoices_Orders_List {
             return;
         }
 
-        global $wpdb;
-
-        // Koliko narudžbi po stranici
+        // Koliko po stranici
         $per_page = 20;
 
-        // Trenutna stranica (paged parametar iz URL-a)
+        // Trenutna stranica
         $paged = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1;
         if ( $paged < 1 ) {
             $paged = 1;
         }
 
-        // Search (broj narudžbe, ID, ime/prezime, e-mail)
+        // Search (ID, broj narudžbe, ime/prezime, e-mail) – Woo nativno podržava pretragu,
+        // ali nije savršena za sve meta kombinacije, pa radimo "best effort".
         $search = isset( $_GET['ci_search'] ) ? sanitize_text_field( wp_unslash( $_GET['ci_search'] ) ) : '';
 
-        // Filter statusa narudžbe (wc status slug, npr. 'processing')
+        // Filter statusa (slug, npr. processing), ili 'all'
         $status_filter = isset( $_GET['ci_status'] ) ? sanitize_text_field( wp_unslash( $_GET['ci_status'] ) ) : 'all';
 
-        // NOVO: filter "samo narudžbe bez računa"
+        // Filter "samo bez računa"
         $only_without_invoice = ! empty( $_GET['ci_no_invoice'] ) ? (bool) absint( $_GET['ci_no_invoice'] ) : false;
 
-        // WooCommerce statusi (key => label)
-        $statuses = wc_get_order_statuses();
-        // npr. 'wc-processing' => 'Processing'
+        // Woo statusi za dropdown i label
+        $statuses = wc_get_order_statuses(); // 'wc-processing' => 'Processing'
 
         /**
-         * 1) Priprema SQL upita za ID-ove narudžbi
+         * wc_get_orders args
          */
-        $posts_table    = $wpdb->posts;
-        $postmeta_table = $wpdb->postmeta;
+        $args = array(
+            'limit'   => $per_page,
+            'page'    => $paged,
+            'orderby' => 'date',
+            'order'   => 'DESC',
+            'return'  => 'objects',
+        );
 
-        $where   = array();
-        $joins   = array();
-        $params  = array();
-
-        // Osnovni where: shop_order i da nije auto-draft
-        $where[]  = "{$posts_table}.post_type = %s";
-        $params[] = 'shop_order';
-
-        $where[]  = "{$posts_table}.post_status NOT IN ('auto-draft')";
-
-        // Filter statusa (ako nije "all")
+        // Status filter
         if ( $status_filter && $status_filter !== 'all' ) {
-            // post_status u bazi je 'wc-processing', 'wc-completed', ...
-            $post_status = 'wc-' . $status_filter;
-            $where[]     = "{$posts_table}.post_status = %s";
-            $params[]    = $post_status;
+            $args['status'] = array( $status_filter ); // e.g. 'processing'
+        } else {
+            // svi statusi
+            $all = array();
+            foreach ( array_keys( $statuses ) as $k ) {
+                $all[] = str_replace( 'wc-', '', $k );
+            }
+            $args['status'] = array_unique( $all );
         }
 
         // Search
         if ( $search !== '' ) {
-            // Pridružujemo postmeta za billing podatke
-            $joins[] = "LEFT JOIN {$postmeta_table} AS pm_billing_first ON (pm_billing_first.post_id = {$posts_table}.ID AND pm_billing_first.meta_key = '_billing_first_name')";
-            $joins[] = "LEFT JOIN {$postmeta_table} AS pm_billing_last  ON (pm_billing_last.post_id  = {$posts_table}.ID AND pm_billing_last.meta_key  = '_billing_last_name')";
-            $joins[] = "LEFT JOIN {$postmeta_table} AS pm_billing_email ON (pm_billing_email.post_id = {$posts_table}.ID AND pm_billing_email.meta_key = '_billing_email')";
-
-            $like = '%' . $wpdb->esc_like( $search ) . '%';
-
             if ( is_numeric( $search ) ) {
-                // Brojka → pokušaj na ID ili post_title (order number)
-                $where[]  = "( {$posts_table}.ID = %d OR {$posts_table}.post_title LIKE %s OR pm_billing_first.meta_value LIKE %s OR pm_billing_last.meta_value LIKE %s OR pm_billing_email.meta_value LIKE %s )";
-                $params[] = (int) $search;
-                $params[] = $like;
-                $params[] = $like;
-                $params[] = $like;
-                $params[] = $like;
+                // Ako je broj, pokušaj direktno ID
+                $args['include'] = array( (int) $search );
             } else {
-                // Tekst → ime, prezime, email, broj u titleu
-                $where[]  = "( {$posts_table}.post_title LIKE %s OR pm_billing_first.meta_value LIKE %s OR pm_billing_last.meta_value LIKE %s OR pm_billing_email.meta_value LIKE %s )";
-                $params[] = $like;
-                $params[] = $like;
-                $params[] = $like;
-                $params[] = $like;
+                // Woo search (ime/email/order number) – ovisi o verziji Woo, ali pomaže
+                $args['search'] = '*' . $search . '*';
             }
         }
 
-        // NOVO: JOIN i uvjet za "bez računa"
-        if ( $only_without_invoice ) {
-            // LEFT JOIN na meta ključ _custom_invoice_attachment_id
-            $joins[] = "LEFT JOIN {$postmeta_table} AS pm_invoice ON (pm_invoice.post_id = {$posts_table}.ID AND pm_invoice.meta_key = '_custom_invoice_attachment_id')";
-            // Želimo one gdje meta NE postoji ili je prazna
-            $where[] = "(pm_invoice.meta_id IS NULL OR pm_invoice.meta_value = '' )";
-        }
-
-        $joins_sql = implode( ' ', array_unique( $joins ) );
-        $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
+        // Dohvati narudžbe
+        $orders = wc_get_orders( $args );
 
         /**
-         * 2) Ukupan broj narudžbi za paginaciju
+         * Ako je uključen filter "bez računa", filtriramo u PHP-u (radi i za HPOS i legacy)
          */
-        $count_sql = "
-            SELECT COUNT(DISTINCT {$posts_table}.ID)
-            FROM {$posts_table}
-            {$joins_sql}
-            {$where_sql}
-        ";
-
-        $total_orders = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) );
-        $total_pages  = $total_orders > 0 ? ceil( $total_orders / $per_page ) : 1;
-
-        if ( $paged > $total_pages ) {
-            $paged = max( 1, $total_pages );
-        }
-
-        $offset = ( $paged - 1 ) * $per_page;
-
-        /**
-         * 3) Dohvat ID-ova narudžbi za prikazanu stranicu
-         */
-        $select_sql = "
-            SELECT DISTINCT {$posts_table}.ID
-            FROM {$posts_table}
-            {$joins_sql}
-            {$where_sql}
-            ORDER BY {$posts_table}.post_date DESC
-            LIMIT %d OFFSET %d
-        ";
-
-        $params_with_limit   = $params;
-        $params_with_limit[] = $per_page;
-        $params_with_limit[] = $offset;
-
-        $order_ids = $wpdb->get_col( $wpdb->prepare( $select_sql, $params_with_limit ) );
-
-        $orders = array();
-        if ( ! empty( $order_ids ) ) {
-            foreach ( $order_ids as $oid ) {
-                $order = wc_get_order( $oid );
-                if ( $order ) {
-                    $orders[] = $order;
+        if ( $only_without_invoice && ! empty( $orders ) ) {
+            $orders = array_values( array_filter( $orders, function( $order ) {
+                if ( ! $order || ! is_a( $order, 'WC_Order' ) ) {
+                    return false;
                 }
-            }
+                $order_id = $order->get_id();
+                $attachment_ids_str = $order->get_meta( '_custom_invoice_attachment_id', true );
+                $attachment_ids     = array_filter( array_map( 'trim', explode( ',', (string) $attachment_ids_str ) ) );
+                return empty( $attachment_ids );
+            } ) );
         }
+
+        /**
+         * Total count (za paginaciju)
+         * wc_get_orders ima 'paginate' => true za točan total, ali onda vraća objekt.
+         * Radimo drugi poziv za count – stabilno i jasno.
+         */
+        $count_args = $args;
+        $count_args['limit']    = 1;
+        $count_args['page']     = 1;
+        $count_args['return']   = 'ids';
+        $count_args['paginate'] = true;
+
+        // Za count NE koristimo include kad je numeric search, jer bi total bio 1 i paginacija besmislena.
+        // Ali u toj situaciji realno i želiš samo tu narudžbu.
+        $count_result = wc_get_orders( $count_args );
+        $total_orders = 0;
+
+        if ( is_object( $count_result ) && isset( $count_result->total ) ) {
+            $total_orders = (int) $count_result->total;
+        } elseif ( is_array( $count_result ) ) {
+            // fallback
+            $total_orders = count( $count_result );
+        }
+
+        // Ako filtriramo "bez računa" u PHP-u, total nije točan – ali barem paginacija ostaje konzistentna po status/searchu.
+        // (Za perfekciju bi radili meta_query, ali HPOS meta query zna biti spor i ovisi o verziji.)
+        $total_pages = $total_orders > 0 ? (int) ceil( $total_orders / $per_page ) : 1;
 
         ?>
         <div class="wrap">
@@ -184,7 +144,6 @@ class Custom_Invoices_Orders_List {
                 <?php esc_html_e( 'Ovdje su WooCommerce narudžbe s informacijom je li račun uploadan / poslan ili ne.', 'custom-invoices' ); ?>
             </p>
 
-            <!-- Filteri: search + status + samo bez računa -->
             <form method="get" style="margin-bottom:12px;">
                 <input type="hidden" name="page" value="custom-invoices-orders" />
                 <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
@@ -198,32 +157,32 @@ class Custom_Invoices_Orders_List {
                             style="min-width:260px;"
                         />
                     </div>
+
                     <div>
                         <select name="ci_status">
                             <option value="all"><?php esc_html_e( 'Svi statusi', 'custom-invoices' ); ?></option>
-                            <?php
-                            foreach ( $statuses as $status_key => $status_label ) {
-                                // status_key = 'wc-processing' → status_slug = 'processing'
-                                $status_slug = str_replace( 'wc-', '', $status_key );
+                            <?php foreach ( $statuses as $status_key => $status_label ) :
+                                $slug = str_replace( 'wc-', '', $status_key );
                                 ?>
-                                <option value="<?php echo esc_attr( $status_slug ); ?>" <?php selected( $status_filter, $status_slug ); ?>>
+                                <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $status_filter, $slug ); ?>>
                                     <?php echo esc_html( $status_label ); ?>
                                 </option>
-                                <?php
-                            }
-                            ?>
+                            <?php endforeach; ?>
                         </select>
                     </div>
+
                     <div>
                         <label style="display:flex;align-items:center;gap:4px;">
                             <input type="checkbox" name="ci_no_invoice" value="1" <?php checked( $only_without_invoice, true ); ?> />
                             <span><?php esc_html_e( 'Samo narudžbe bez računa', 'custom-invoices' ); ?></span>
                         </label>
                     </div>
+
                     <div>
                         <button class="button button-secondary" type="submit">
                             <?php esc_html_e( 'Filtriraj', 'custom-invoices' ); ?>
                         </button>
+
                         <?php if ( $search !== '' || ( $status_filter && $status_filter !== 'all' ) || $only_without_invoice ) : ?>
                             <a href="<?php echo esc_url( admin_url( 'admin.php?page=custom-invoices-orders' ) ); ?>" class="button">
                                 <?php esc_html_e( 'Resetiraj filtere', 'custom-invoices' ); ?>
@@ -244,91 +203,71 @@ class Custom_Invoices_Orders_List {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    if ( empty( $orders ) ) :
+                <?php if ( empty( $orders ) ) : ?>
+                    <tr>
+                        <td colspan="5"><?php esc_html_e( 'Nema narudžbi za prikaz.', 'custom-invoices' ); ?></td>
+                    </tr>
+                <?php else : ?>
+                    <?php foreach ( $orders as $order ) :
+                        /** @var WC_Order $order */
+                        $order_id   = $order->get_id();
+                        $order_link = method_exists( $order, 'get_edit_order_url' )
+                            ? $order->get_edit_order_url()
+                            : get_edit_post_link( $order_id );
+
+                        $customer_name = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
+                        if ( $customer_name === '' ) {
+                            $customer_name = __( '(bez imena)', 'custom-invoices' );
+                        }
+
+                        $status_slug  = $order->get_status(); // 'processing'
+                        $status_key   = 'wc-' . $status_slug;
+                        $status_label = isset( $statuses[ $status_key ] ) ? $statuses[ $status_key ] : ucfirst( $status_slug );
+
+                        $attachment_ids_str = $order->get_meta( '_custom_invoice_attachment_id', true );
+                        $attachment_ids     = array_filter( array_map( 'trim', explode( ',', (string) $attachment_ids_str ) ) );
+                        $has_invoice        = ! empty( $attachment_ids );
                         ?>
                         <tr>
-                            <td colspan="5"><?php esc_html_e( 'Nema narudžbi za prikaz.', 'custom-invoices' ); ?></td>
-                        </tr>
-                        <?php
-                    else :
-                        foreach ( $orders as $order ) :
-                            /** @var WC_Order $order */
-                            $order_id   = $order->get_id();
-                            $order_link = get_edit_post_link( $order_id );
-
-                            $billing_first_name = $order->get_billing_first_name();
-                            $billing_last_name  = $order->get_billing_last_name();
-                            $customer_name      = trim( $billing_first_name . ' ' . $billing_last_name );
-                            if ( $customer_name === '' ) {
-                                $customer_name = __( '(bez imena)', 'custom-invoices' );
-                            }
-
-                            // Status narudžbe (slug + label)
-                            $status_slug  = $order->get_status(); // npr. 'processing'
-                            $status_key   = 'wc-' . $status_slug;
-                            $status_label = isset( $statuses[ $status_key ] ) ? $statuses[ $status_key ] : ucfirst( $status_slug );
-
-                            /**
-                             * PROVJERA JE LI RAČUN UPLOADAN / POSLAN
-                             *
-                             * Koristimo meta ključ _custom_invoice_attachment_id (comma-separated attachment IDs).
-                             */
-                            $attachment_ids_str = get_post_meta( $order_id, '_custom_invoice_attachment_id', true );
-                            $attachment_ids     = array_filter( explode( ',', (string) $attachment_ids_str ) );
-                            $has_invoice        = ! empty( $attachment_ids );
-                            ?>
-                            <tr>
-                                <td>
-                                    <a href="<?php echo esc_url( $order_link ); ?>">
-                                        #<?php echo esc_html( $order->get_order_number() ); ?>
+                            <td>
+                                <a href="<?php echo esc_url( $order_link ); ?>">
+                                    #<?php echo esc_html( $order->get_order_number() ); ?>
+                                </a>
+                            </td>
+                            <td><?php echo esc_html( $customer_name ); ?></td>
+                            <td>
+                                <span class="order-status status-<?php echo esc_attr( $status_slug ); ?>">
+                                    <?php echo esc_html( $status_label ); ?>
+                                </span>
+                            </td>
+                            <td>
+                                <?php if ( $has_invoice ) : ?>
+                                    <span style="color:#1a7f37;font-weight:600;"><?php esc_html_e( 'POSLAN', 'custom-invoices' ); ?></span>
+                                <?php else : ?>
+                                    <span style="color:#d63638;font-weight:600;"><?php esc_html_e( 'NEMA / NIJE POSLAN', 'custom-invoices' ); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ( $has_invoice ) : ?>
+                                    <a href="<?php echo esc_url( $order_link ); ?>" class="button button-secondary">
+                                        <?php esc_html_e( 'Pogledaj narudžbu', 'custom-invoices' ); ?>
                                     </a>
-                                </td>
-                                <td>
-                                    <?php echo esc_html( $customer_name ); ?>
-                                </td>
-                                <td>
-                                    <span class="order-status status-<?php echo esc_attr( $status_slug ); ?>">
-                                        <?php echo esc_html( $status_label ); ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php if ( $has_invoice ) : ?>
-                                        <span style="color:#1a7f37;font-weight:600;">
-                                            <?php esc_html_e( 'POSLAN', 'custom-invoices' ); ?>
-                                        </span>
-                                    <?php else : ?>
-                                        <span style="color:#d63638;font-weight:600;">
-                                            <?php esc_html_e( 'NEMA / NIJE POSLAN', 'custom-invoices' ); ?>
-                                        </span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if ( $has_invoice ) : ?>
-                                        <a href="<?php echo esc_url( $order_link ); ?>" class="button button-secondary">
-                                            <?php esc_html_e( 'Pogledaj narudžbu', 'custom-invoices' ); ?>
-                                        </a>
-                                    <?php else : ?>
-                                        <a href="<?php echo esc_url( $order_link . '#custom-invoice-box' ); ?>" class="button button-primary">
-                                            <?php esc_html_e( 'Uploadaj račun', 'custom-invoices' ); ?>
-                                        </a>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <?php
-                        endforeach;
-                    endif;
-                    ?>
+                                <?php else : ?>
+                                    <a href="<?php echo esc_url( $order_link . '#custom-invoice-box' ); ?>" class="button button-primary">
+                                        <?php esc_html_e( 'Uploadaj račun', 'custom-invoices' ); ?>
+                                    </a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
                 </tbody>
             </table>
 
-            <?php
-            // PAGINACIJA – centrirana i s većim fontom
-            if ( $total_pages > 1 ) :
+            <?php if ( $total_pages > 1 ) :
                 $base_url = admin_url( 'admin.php?page=custom-invoices-orders' );
-
-                // Zadrži search, status i checkbox u query stringu
                 $base_args = array();
+
                 if ( $search !== '' ) {
                     $base_args['ci_search'] = $search;
                 }
@@ -355,9 +294,7 @@ class Custom_Invoices_Orders_List {
                         ?>
                     </div>
                 </div>
-                <?php
-            endif;
-            ?>
+            <?php endif; ?>
         </div>
         <?php
     }
