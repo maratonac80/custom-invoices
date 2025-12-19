@@ -114,6 +114,11 @@ class Custom_Invoices_Updater {
     public static function fix_directory_name( $source, $remote_source, $upgrader, $hook_extra = array() ) {
         global $wp_filesystem;
 
+        // Ensure WordPress filesystem is available
+        if ( ! $wp_filesystem ) {
+            return $source;
+        }
+
         // Only process our plugin updates
         if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== plugin_basename( CUSTOM_INVOICES_PLUGIN_FILE ) ) {
             return $source;
@@ -121,6 +126,11 @@ class Custom_Invoices_Updater {
 
         // Get the expected directory name
         $plugin_folder = dirname( plugin_basename( CUSTOM_INVOICES_PLUGIN_FILE ) );
+        
+        // Validate plugin folder name
+        if ( empty( $plugin_folder ) || $plugin_folder === '.' ) {
+            return $source;
+        }
         
         // Check if source already has correct name
         if ( basename( $source ) === $plugin_folder ) {
