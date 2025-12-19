@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Custom_Invoices_Updater {
 
     const GITHUB_API_URL = 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest';
-    const FALLBACK_VERSION = 'v1.0.8';
+    const FALLBACK_VERSION = 'v1.0.9';
 
     public static function init() {
         add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'check_for_updates' ) );
