@@ -6,9 +6,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Custom_Invoices_Updater {
 
+    const GITHUB_API_URL = 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest';
+
     public static function init() {
         add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'check_for_updates' ) );
         add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 10, 3 );
+    }
+
+    private static function get_latest_version_from_github() {
+        $response = wp_remote_get( self::GITHUB_API_URL );
+        if ( is_wp_error( $response ) ) {
+            error_log( 'API error: ' . $response->get_error_message() );
+            return false;
+        }
+
+        $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
+        return isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : false;
     }
 
     public static function check_for_updates( $transient ) {
@@ -17,15 +30,10 @@ class Custom_Invoices_Updater {
         $plugin_data = get_plugin_data( CUSTOM_INVOICES_PLUGIN_FILE );
 
         // Dohvati podatke o zadnjem release-u s GitHub-a
-        $response = wp_remote_get( 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest' );
-        if ( is_wp_error( $response ) ) {
-            error_log( 'API error: ' . $response->get_error_message() );
+        $latest_version = self::get_latest_version_from_github();
+        if ( ! $latest_version ) {
             return $transient;
         }
-
-        // Decodiraj podatke
-        $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
-        $latest_version = isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : '';
 
         // Provjera trenutne verzije i dohvat nove
         if ( version_compare( $plugin_data['Version'], $latest_version, '<' ) ) {
@@ -48,13 +56,9 @@ class Custom_Invoices_Updater {
         }
 
         // Dohvati najnoviju verziju s GitHub-a
-        $response = wp_remote_get( 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest' );
-        if ( is_wp_error( $response ) ) {
-            error_log( 'API error in plugin_info: ' . $response->get_error_message() );
+        $latest_version = self::get_latest_version_from_github();
+        if ( ! $latest_version ) {
             $latest_version = 'v1.0.1'; // Fallback verzija
-        } else {
-            $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
-            $latest_version = isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : 'v1.0.1';
         }
 
         return (object) array(
