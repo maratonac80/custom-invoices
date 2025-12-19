@@ -1,20 +1,12 @@
 <?php
-/**
- * Plugin Name: Custom Invoices
- * Description: Višestruki PDF upload za WooCommerce narudžbe, prilagođeni HTML e-mail i kartica "Moji računi" u WooCommerce -> Moj račun.
- * Author: (tvoj naziv)
- * Version: 3.0.0
- * Text Domain: custom-invoices
- * Domain Path: /languages
- * Requires Plugins: woocommerce
- *
- * OVAJ FILE:
- * - je Bootstrap plugina (jedini s plugin headerom),
- * - definira konstante za putanju i URL plugina,
- * - uključuje loader (includes/loader.php) i customer-mail.php,
- * - registrira activation/deactivation hookove,
- * - pokreće inicijalizaciju svih modula preko Custom_Invoices_Loader::init().
- */
+/*
+ Plugin Name: Custom Invoices
+ Plugin URI: https://github.com/maratonac80/custom-invoices
+ Description: Plugin for custom invoice handling.
+ Version: 1.0.0
+ Author: Zoran Filipović
+ Author URI: https://peroneus.hr
+*/
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;

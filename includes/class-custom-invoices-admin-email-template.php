@@ -85,47 +85,64 @@ class Custom_Invoices_Admin_Email_Template {
         $is_hr = ( $lang === 'hr' );
 
         /* RESET */
-        if (
-            isset( $_POST['custom_invoices_do_reset'] ) &&
-            $_POST['custom_invoices_do_reset'] === '1' &&
-            isset( $_POST['custom_invoices_reset_template_nonce'] ) &&
-            wp_verify_nonce( $_POST['custom_invoices_reset_template_nonce'], 'custom_invoices_reset_template' )
-        ) {
-            delete_option( 'custom_invoices_email_mode' );
-            delete_option( 'custom_invoices_default_shop_name' );
-            delete_option( 'custom_invoices_default_header_bg_color' );
-            delete_option( 'custom_invoices_default_logo_url' );
-            delete_option( 'custom_invoices_default_content_intro' );
-            delete_option( 'custom_invoices_default_contact_email' );
-            delete_option( 'custom_invoices_default_contact_phone' );
-            delete_option( 'custom_invoices_help_title' );
-            delete_option( 'custom_invoices_help_line' );
-            delete_option( 'custom_invoices_primary_color' );
-            delete_option( 'custom_invoices_footer_company' );
-            delete_option( 'custom_invoices_footer_address' );
-            delete_option( 'custom_invoices_footer_tax_id' );
-            delete_option( 'custom_invoices_email_template_html' );
+if (
+    isset( $_POST['custom_invoices_do_reset'] ) &&
+    $_POST['custom_invoices_do_reset'] === '1' &&
+    isset( $_POST['custom_invoices_reset_template_nonce'] ) &&
+    wp_verify_nonce( $_POST['custom_invoices_reset_template_nonce'], 'custom_invoices_reset_template' )
+) {
+    delete_option( 'custom_invoices_email_mode' );
+    delete_option( 'custom_invoices_default_shop_name' );
+    delete_option( 'custom_invoices_default_header_bg_color' );
+    delete_option( 'custom_invoices_default_logo_url' );
+    delete_option( 'custom_invoices_default_content_intro' );
+    delete_option( 'custom_invoices_default_contact_email' );
+    delete_option( 'custom_invoices_default_contact_phone' );
+    delete_option( 'custom_invoices_help_title' );
+    delete_option( 'custom_invoices_help_line' );
+    delete_option( 'custom_invoices_primary_color' );
+    delete_option( 'custom_invoices_footer_company' );
+    delete_option( 'custom_invoices_footer_address' );
+    delete_option( 'custom_invoices_footer_tax_id' );
+    delete_option( 'custom_invoices_email_template_html' );
 
-            echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html(
-                $is_hr
-                    ? 'Predložak je vraćen na standardne vrijednosti.'
-                    : 'Template has been reset to the default values.'
-            ) . '</p></div>';
-        }
+    // Postavi hero podnaslov na defaultnu vrijednost
+    $default_hero_subtitle_tpl = $is_hr
+        ? 'Šaljemo Vam račun po Vašoj narudžbi #%s'
+        : 'We are sending you the invoice for your order #%s';
+
+    update_option( 'custom_invoices_hero_subtitle', $default_hero_subtitle_tpl );
+
+    echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html(
+        $is_hr
+            ? 'Predložak je vraćen na standardne vrijednosti.'
+            : 'Template has been reset to the default values.'
+    ) . '</p></div>';
+}
 
         // PROMJENA JEZIKA – poseban gumb odmah pored selecta
-        if (
-            isset( $_POST['custom_invoices_change_language'] ) &&
-            isset( $_POST['custom_invoices_email_language'] )
-        ) {
-            $new_lang = sanitize_text_field( wp_unslash( $_POST['custom_invoices_email_language'] ) );
-            if ( ! in_array( $new_lang, array( 'hr', 'en' ), true ) ) {
-                $new_lang = 'hr';
-            }
-            update_option( 'custom_invoices_email_language', $new_lang );
-            $lang  = $new_lang;
-            $is_hr = ( $lang === 'hr' );
-        }
+       if (
+    isset( $_POST['custom_invoices_change_language'] ) &&
+    isset( $_POST['custom_invoices_email_language'] )
+) {
+    $new_lang = sanitize_text_field( wp_unslash( $_POST['custom_invoices_email_language'] ) );
+    if ( ! in_array( $new_lang, array( 'hr', 'en' ), true ) ) {
+        $new_lang = 'hr';
+    }
+    update_option( 'custom_invoices_email_language', $new_lang );
+
+    // Odredite defaultni hero podnaslov prema novom jeziku
+    $default_hero_subtitle_tpl = ( $new_lang === 'hr' )
+        ? 'Šaljemo Vam račun po Vašoj narudžbi #%s'
+        : 'We are sending you the invoice for your order #%s';
+
+    // Ukloni trenutnu vrijednost i postavi novu
+    delete_option( 'custom_invoices_hero_subtitle' );
+    update_option( 'custom_invoices_hero_subtitle', $default_hero_subtitle_tpl );
+
+    $lang  = $new_lang;
+    $is_hr = ( $lang === 'hr' );
+}
 
         // SAVE SETTINGS
         if (
@@ -378,31 +395,9 @@ $stored_hero_subtitle = get_option( 'custom_invoices_hero_subtitle', '' );
                     <h2 style="margin-top:20px;"><?php echo esc_html( $is_hr ? 'HEADER (plavi dio + logo)' : 'HEADER (blue area + logo)' ); ?></h2>
                     <table class="form-table">
                         <tr>
-                            <th><label for="custom_invoices_default_shop_name"><?php echo esc_html( $is_hr ? 'Shop Name / naziv tvrtke' : 'Shop Name / Company name' ); ?></label></th>
+                            <th><label for="custom_invoices_default_shop_name"><?php echo esc_html( $is_hr ? 'Naslov u headeru (plavi dio)' : 'Header title (blue area)' ); ?></label></th>
                             <td><input type="text" id="custom_invoices_default_shop_name" name="custom_invoices_default_shop_name" class="regular-text" value="<?php echo esc_attr( $default_shop_name ); ?>"></td>
                         </tr>
-    <!-- NOVO: glavni naslov e-maila -->
-    <tr>
-        <th>
-            <label for="custom_invoices_email_title">
-                <?php echo esc_html( $is_hr ? 'Naslov e-maila (glavni naslov)' : 'Main e-mail title' ); ?>
-            </label>
-        </th>
-        <td>
-            <input type="text"
-                   id="custom_invoices_email_title"
-                   name="custom_invoices_email_title"
-                   class="regular-text"
-                   value="<?php echo esc_attr( $stored_email_title ); ?>">
-            <p class="description">
-                <?php echo esc_html( $is_hr
-                    ? 'Ako je prazno, koristi se zadani naslov ovisno o jeziku (npr. "Vaši računi" / "Your invoices").'
-                    : 'If empty, a default title will be used depending on the language (e.g. "Vaši računi" / "Your invoices").'
-                ); ?>
-            </p>
-        </td>
-    </tr>
-
     <!-- NOVO: podnaslov u plavom headeru -->
     <tr>
         <th>
@@ -418,7 +413,7 @@ $stored_hero_subtitle = get_option( 'custom_invoices_hero_subtitle', '' );
                    value="<?php echo esc_attr( $stored_hero_subtitle ); ?>">
             <p class="description">
                 <?php echo esc_html( $is_hr
-                    ? 'Ako je prazno, koristi se zadani tekst ovisno o jeziku. Može sadržavati %s za broj narudžbe.'
+                    ? 'Ako je prazno, koristi se zadani tekst ovisno o jeziku.'
                     : 'If empty, a default text will be used depending on the language. You can include %s for the order number.'
                 ); ?>
             </p>
