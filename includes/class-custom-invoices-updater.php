@@ -15,15 +15,22 @@ class Custom_Invoices_Updater {
     }
 
     private static function get_latest_version_from_github() {
-        $response = wp_remote_get( self::GITHUB_API_URL );
+        $args = array(
+            'timeout' => 10,
+            'headers' => array(
+                'User-Agent' => 'Custom-Invoices-Plugin-Updater',
+            ),
+        );
+
+        $response = wp_remote_get( self::GITHUB_API_URL, $args );
         if ( is_wp_error( $response ) ) {
-            error_log( 'Custom Invoices Updater - Failed to fetch latest version from GitHub API: ' . $response->get_error_message() );
+            error_log( 'Custom Invoices Updater - Failed to fetch latest version from GitHub API' );
             return false;
         }
 
         $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
         if ( json_last_error() !== JSON_ERROR_NONE ) {
-            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response: ' . json_last_error_msg() );
+            error_log( 'Custom Invoices Updater - Failed to decode GitHub API response' );
             return false;
         }
 
