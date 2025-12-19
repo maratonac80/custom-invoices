@@ -102,7 +102,7 @@ class Custom_Invoices_Updater {
 
     /**
      * Fix the directory name when updating from GitHub archive.
-     * GitHub archives have directory names like 'custom-invoices-1.0.7' 
+     * GitHub archives have directory names like 'custom-invoices-1.0.7'
      * but WordPress expects 'custom-invoices'.
      *
      * @param string      $source        File source location.
@@ -116,6 +116,7 @@ class Custom_Invoices_Updater {
 
         // Ensure WordPress filesystem is available
         if ( ! $wp_filesystem ) {
+            error_log( 'Custom Invoices Updater - WordPress filesystem not available during update' );
             return $source;
         }
 
