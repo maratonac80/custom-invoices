@@ -8,6 +8,8 @@
  * - na activation hooku podešava početne opcije i rewrite endpoint,
  * - na deactivation hooku radi flush_rewrite_rules().
  */
+require_once CUSTOM_INVOICES_PLUGIN_PATH . 'includes/class-custom-invoices-updater.php';
+Custom_Invoices_Updater::init();
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
