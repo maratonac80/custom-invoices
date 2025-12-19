@@ -47,7 +47,15 @@ class Custom_Invoices_Updater {
             return false;
         }
 
-        $latest_version = 'v1.0.1'; // Zamijeniti sa API dohvatom ako je potrebno
+        // Dohvati najnoviju verziju s GitHub-a
+        $response = wp_remote_get( 'https://api.github.com/repos/maratonac80/custom-invoices/releases/latest' );
+        if ( is_wp_error( $response ) ) {
+            error_log( 'API error in plugin_info: ' . $response->get_error_message() );
+            $latest_version = 'v1.0.1'; // Fallback verzija
+        } else {
+            $release_data = json_decode( wp_remote_retrieve_body( $response ), true );
+            $latest_version = isset( $release_data['tag_name'] ) ? $release_data['tag_name'] : 'v1.0.1';
+        }
 
         return (object) array(
             'name'        => 'Custom Invoices Plugin',
